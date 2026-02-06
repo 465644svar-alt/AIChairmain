@@ -1,71 +1,47 @@
 # AIChairmain
 
-A council of LLMs deliberates on your question. Inspired by [llm-council](https://github.com/karpathy/llm-council), but using direct provider APIs instead of OpenRouter.
+Проект содержит две реализации арбитража LLM:
 
-## How It Works
+- `backend/` + `frontend/` — существующий web-стек.
+- `app/` — новый desktop-клиент на **Python + PySide6** с ветвящимся чатом и 3-этапным Council pipeline.
 
-**Three-stage deliberation process:**
+## Desktop app (PySide6)
 
-1. **Responses** — Each council member (GPT-4o, Claude Sonnet, Gemini Flash) independently answers your question.
-2. **Peer Review** — Each member reviews and ranks the other responses (anonymized to prevent bias).
-3. **Synthesis** — The Chairman model (Claude Opus) synthesizes all responses and reviews into a single definitive answer.
+### Возможности
 
-## Architecture
+1. Stage 1: параллельный сбор ответов от GPT / DeepSeek / Claude / Mistral / Groq.
+2. Stage 2: анонимный peer-review и парсинг строгого блока `FINAL RANKING`.
+3. Aggregation: average-rank агрегатор.
+4. Stage 3: chairman synthesis + fallback на лучший Stage1 ответ.
+5. Branching chat tree: выбор ветки, возврат к узлу, продолжение от узла.
+6. Export чата в `.md` (active branch) и `.json` (full tree).
+7. History storage (`data/conversations/*.json`) и вкладка логов.
 
-```
-backend/          FastAPI server
-  providers/      Direct API integrations (OpenAI, Anthropic, Google)
-  council.py      3-stage council logic
-  storage.py      JSON conversation storage
-  config.py       Model & API configuration
-
-frontend/         React + Vite
-  src/components/ UI components (query, tabs, reviews, synthesis)
-  src/api/        API client
-```
-
-## Setup
-
-### 1. Backend
+### Запуск
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your API keys
-python -m backend
+python -m app.main
 ```
 
-### 2. Frontend
+### Конфигурация
+
+API ключи хранятся только в `.env` (не в git). Поддерживаются переменные:
+
+- `OPENAI_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `MISTRAL_API_KEY`
+- `GROQ_API_KEY`
+
+При необходимости можно переопределить `*_BASE_URL`.
+
+## Тесты
 
 ```bash
-cd frontend
-npm install
-npm run dev
+pytest app/tests -q
 ```
-
-Open http://localhost:5173
-
-## Configuration
-
-Edit `backend/config.py` to change council members or the chairman model. Any model available from OpenAI, Anthropic, or Google can be used.
-
-## Modes
-
-- **Full Council** — Runs all 3 stages automatically and returns the complete result.
-- **Step-by-Step** — Runs each stage independently so you can inspect intermediate results.
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/council/members` | List council members |
-| POST | `/api/council/run` | Run full 3-stage process |
-| POST | `/api/council/start` | Start session (Stage 1 only) |
-| POST | `/api/council/{id}/review` | Run Stage 2 |
-| POST | `/api/council/{id}/synthesize` | Run Stage 3 |
-| GET | `/api/council/{id}` | Get session by ID |
-| GET | `/api/sessions` | List all sessions |
 
 ## License
 
