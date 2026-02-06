@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import time
 import logging
-import httpx
+import time
 from json import JSONDecodeError
+from typing import Any
+
+import httpx
 
 from ..types import LLMResult
 
@@ -17,14 +19,38 @@ class AsyncProviderClient:
         self.api_key = api_key
         self.model_path = model_path
 
+    async def check_connectivity(self, timeout: float) -> tuple[bool, str | None, int, dict[str, Any] | None]:
+        started = time.perf_counter()
+        if not self.api_key:
+            return False, "api key is not configured", 0, None
+
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        probe_url = f"{self.base_url}/models"
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.get(probe_url, headers=headers)
+            latency = int((time.perf_counter() - started) * 1000)
+            data = self._safe_json(resp)
+
+            if resp.status_code in (401, 403):
+                return False, f"auth error ({resp.status_code})", latency, data
+            if resp.status_code >= 500:
+                return False, f"provider unavailable ({resp.status_code})", latency, data
+            return True, None, latency, data
+        except httpx.TimeoutException:
+            latency = int((time.perf_counter() - started) * 1000)
+            return False, "timeout", latency, None
+        except httpx.HTTPError as exc:
+            latency = int((time.perf_counter() - started) * 1000)
+            return False, f"network/http error: {exc}", latency, None
+
     async def chat(self, model: str, messages: list[dict], timeout: float) -> LLMResult:
         started = time.perf_counter()
         if not self.api_key:
             return LLMResult(self.provider, model, None, "api key is not configured", 0, None)
 
-        headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
         payload = {"model": model, "messages": messages}
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -56,10 +82,14 @@ class AsyncProviderClient:
             return LLMResult(self.provider, model, None, f"unexpected error: {exc}", latency, None)
 
     @staticmethod
-    def _safe_json(resp: httpx.Response) -> dict | list | None:
+    def _safe_json(resp: httpx.Response) -> dict[str, Any] | None:
         if not resp.content:
             return None
         try:
-            return resp.json()
+            parsed = resp.json()
         except JSONDecodeError:
             return {"raw": resp.text}
+
+        if isinstance(parsed, dict):
+            return parsed
+        return {"data": parsed}

@@ -28,9 +28,16 @@ class CouncilOrchestrator:
 
     async def stage1_collect(self, question: str, models: dict[str, str]) -> Stage1Result:
         messages = [{"role": "user", "content": question}]
-        tasks = [self.clients[p].chat(m, messages, self.timeout) for p, m in models.items() if p in self.clients]
+        tasks = [self._chat_with_preflight(p, m, messages) for p, m in models.items() if p in self.clients]
         results = await asyncio.gather(*tasks, return_exceptions=False)
         return Stage1Result(question=question, responses=results)
+
+    async def _chat_with_preflight(self, provider: str, model: str, messages: list[dict]) -> LLMResult:
+        client = self.clients[provider]
+        ok, error, latency, raw = await client.check_connectivity(self.timeout)
+        if not ok:
+            return LLMResult(provider, model, None, f"connectivity check failed: {error}", latency, raw)
+        return await client.chat(model, messages, self.timeout)
 
     async def stage2_peer_review(self, question: str, stage1: Stage1Result) -> Stage2Result:
         valid = [r for r in stage1.responses if r.content]
