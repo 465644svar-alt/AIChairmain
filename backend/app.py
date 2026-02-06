@@ -3,11 +3,13 @@ AIChairmain — FastAPI application.
 A council of LLMs that deliberate on your question.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import StreamingResponse
 
 from backend.config import FRONTEND_URL, COUNCIL_MEMBERS, CHAIRMAN_MODEL
 from backend.models import QueryRequest, CouncilSession
@@ -18,6 +20,7 @@ from backend.council import (
     run_stage_synthesis,
 )
 from backend.storage import load_session, list_sessions, save_session
+from backend.event_log import get_log_history, subscribe, unsubscribe
 
 import uuid
 
@@ -50,7 +53,7 @@ app.add_middleware(
 )
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────
+# ── Council Endpoints ──────────────────────────────────────────────────────
 
 
 @app.get("/api/health")
@@ -132,3 +135,42 @@ async def get_session(session_id: str):
 async def get_sessions():
     """List all saved sessions."""
     return list_sessions()
+
+
+# ── Log Endpoints ──────────────────────────────────────────────────────────
+
+
+@app.get("/api/logs")
+async def get_logs():
+    """Return all stored log entries."""
+    return get_log_history()
+
+
+@app.get("/api/logs/stream")
+async def stream_logs():
+    """SSE endpoint — streams log events in real time."""
+    queue = subscribe()
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {data}\n\n"
+                except asyncio.TimeoutError:
+                    # Send keepalive comment to prevent connection timeout
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            unsubscribe(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

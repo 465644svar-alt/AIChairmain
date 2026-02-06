@@ -12,6 +12,8 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 
 # Council member definitions
 # Each member has: id, name, provider, model
@@ -33,6 +35,18 @@ COUNCIL_MEMBERS = [
         "name": "Gemini 2.0 Flash",
         "provider": "google",
         "model": "gemini-2.0-flash",
+    },
+    {
+        "id": "groq-llama",
+        "name": "Llama 3.3 70B (Groq)",
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile",
+    },
+    {
+        "id": "mistral-large",
+        "name": "Mistral Large",
+        "provider": "mistral",
+        "model": "mistral-large-latest",
     },
 ]
 

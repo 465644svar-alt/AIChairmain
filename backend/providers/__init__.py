@@ -3,11 +3,15 @@
 from backend.providers.openai_provider import OpenAIProvider
 from backend.providers.anthropic_provider import AnthropicProvider
 from backend.providers.google_provider import GoogleProvider
+from backend.providers.groq_provider import GroqProvider
+from backend.providers.mistral_provider import MistralProvider
 
 PROVIDERS = {
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
     "google": GoogleProvider,
+    "groq": GroqProvider,
+    "mistral": MistralProvider,
 }
 
 

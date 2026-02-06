@@ -5,6 +5,7 @@ import ResponseTabs from "./components/ResponseTabs.jsx";
 import ReviewPanel from "./components/ReviewPanel.jsx";
 import SynthesisPanel from "./components/SynthesisPanel.jsx";
 import SessionHistory from "./components/SessionHistory.jsx";
+import LogViewer from "./components/LogViewer.jsx";
 import {
   runFullCouncil,
   startSession,
@@ -18,6 +19,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [mode, setMode] = useState("full"); // "full" or "step"
   const [loadingStage, setLoadingStage] = useState(null);
+  const [activeView, setActiveView] = useState("council"); // "council" or "logs"
 
   const handleFullRun = useCallback(async (query) => {
     setLoading(true);
@@ -91,62 +93,83 @@ export default function App() {
         <p>A council of LLMs deliberates on your question</p>
       </header>
 
-      <QueryForm
-        onSubmit={handleSubmit}
-        loading={loading}
-        mode={mode}
-        onModeChange={setMode}
-      />
+      <div className="view-tabs">
+        <button
+          className={`view-tab ${activeView === "council" ? "active" : ""}`}
+          onClick={() => setActiveView("council")}
+        >
+          Council
+        </button>
+        <button
+          className={`view-tab ${activeView === "logs" ? "active" : ""}`}
+          onClick={() => setActiveView("logs")}
+        >
+          Logs
+        </button>
+      </div>
 
-      {error && <div className="error-msg">{error}</div>}
-
-      {loading && (
-        <div className="loading">
-          <div className="spinner" />
-          <span>{stageLabel[loadingStage] || "Processing..."}</span>
-        </div>
-      )}
-
-      {session && (
+      {activeView === "council" && (
         <>
-          <ProgressBar currentStage={session.stage} />
+          <QueryForm
+            onSubmit={handleSubmit}
+            loading={loading}
+            mode={mode}
+            onModeChange={setMode}
+          />
 
-          {session.responses.length > 0 && (
-            <section style={{ marginBottom: "1.5rem" }}>
-              <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>
-                Individual Responses
-              </h2>
-              <ResponseTabs responses={session.responses} />
-            </section>
-          )}
+          {error && <div className="error-msg">{error}</div>}
 
-          {session.reviews.length > 0 && (
-            <section style={{ marginBottom: "1.5rem" }}>
-              <ReviewPanel reviews={session.reviews} />
-            </section>
-          )}
-
-          {session.synthesis && (
-            <section style={{ marginBottom: "1.5rem" }}>
-              <SynthesisPanel synthesis={session.synthesis} />
-            </section>
-          )}
-
-          {mode === "step" && !loading && session.stage !== "complete" && (
-            <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
-              <button className="btn-primary" onClick={handleNextStep}>
-                {session.stage === "review"
-                  ? "Run Peer Review"
-                  : session.stage === "synthesis"
-                  ? "Run Synthesis"
-                  : "Next Step"}
-              </button>
+          {loading && (
+            <div className="loading">
+              <div className="spinner" />
+              <span>{stageLabel[loadingStage] || "Processing..."}</span>
             </div>
           )}
+
+          {session && (
+            <>
+              <ProgressBar currentStage={session.stage} />
+
+              {session.responses.length > 0 && (
+                <section style={{ marginBottom: "1.5rem" }}>
+                  <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>
+                    Individual Responses
+                  </h2>
+                  <ResponseTabs responses={session.responses} />
+                </section>
+              )}
+
+              {session.reviews.length > 0 && (
+                <section style={{ marginBottom: "1.5rem" }}>
+                  <ReviewPanel reviews={session.reviews} />
+                </section>
+              )}
+
+              {session.synthesis && (
+                <section style={{ marginBottom: "1.5rem" }}>
+                  <SynthesisPanel synthesis={session.synthesis} />
+                </section>
+              )}
+
+              {mode === "step" && !loading && session.stage !== "complete" && (
+                <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+                  <button className="btn-primary" onClick={handleNextStep}>
+                    {session.stage === "review"
+                      ? "Run Peer Review"
+                      : session.stage === "synthesis"
+                      ? "Run Synthesis"
+                      : "Next Step"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          <SessionHistory onLoadSession={handleLoadSession} />
         </>
       )}
 
-      <SessionHistory onLoadSession={handleLoadSession} />
+      {activeView === "logs" && <LogViewer />}
     </div>
   );
 }

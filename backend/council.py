@@ -7,6 +7,7 @@ Stage 3: The Chairman synthesizes everything into a final answer.
 """
 
 import asyncio
+import time
 import uuid
 import logging
 
@@ -19,6 +20,7 @@ from backend.models import (
 )
 from backend.providers import get_provider
 from backend.storage import save_session
+from backend.event_log import log_request, log_response, log_error, log_info
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +52,17 @@ SYSTEM_PROMPT_SYNTHESIS = (
 )
 
 
+def _preview(text: str, max_len: int = 200) -> str:
+    """Truncate text for log preview."""
+    if len(text) <= max_len:
+        return text
+    return text[:max_len] + "..."
+
+
 async def _query_member(member: dict, query: str) -> MemberResponse:
     """Query a single council member."""
+    log_request("responses", member["provider"], member["model"], _preview(query))
+    t0 = time.monotonic()
     try:
         provider = get_provider(member["provider"])
         text = await provider.generate(
@@ -59,6 +70,8 @@ async def _query_member(member: dict, query: str) -> MemberResponse:
             system_prompt=SYSTEM_PROMPT_RESPOND,
             user_prompt=query,
         )
+        duration = (time.monotonic() - t0) * 1000
+        log_response("responses", member["provider"], member["model"], _preview(text), duration)
         return MemberResponse(
             member_id=member["id"],
             member_name=member["name"],
@@ -67,6 +80,8 @@ async def _query_member(member: dict, query: str) -> MemberResponse:
             response=text,
         )
     except Exception as e:
+        duration = (time.monotonic() - t0) * 1000
+        log_error("responses", member["provider"], member["model"], str(e), duration)
         logger.error(f"Error querying {member['name']}: {e}")
         return MemberResponse(
             member_id=member["id"],
@@ -101,6 +116,8 @@ async def _review_by_member(
     import json as _json
 
     prompt = _build_review_prompt(query, responses, member["id"])
+    log_request("review", member["provider"], member["model"], _preview(prompt))
+    t0 = time.monotonic()
     try:
         provider = get_provider(member["provider"])
         text = await provider.generate(
@@ -108,6 +125,8 @@ async def _review_by_member(
             system_prompt=SYSTEM_PROMPT_REVIEW,
             user_prompt=prompt,
         )
+        duration = (time.monotonic() - t0) * 1000
+        log_response("review", member["provider"], member["model"], _preview(text), duration)
         # Parse JSON rankings
         text = text.strip()
         if text.startswith("```"):
@@ -119,6 +138,8 @@ async def _review_by_member(
             rankings=rankings,
         )
     except Exception as e:
+        duration = (time.monotonic() - t0) * 1000
+        log_error("review", member["provider"], member["model"], str(e), duration)
         logger.error(f"Error in review by {member['name']}: {e}")
         return PeerReview(
             reviewer_id=member["id"],
@@ -158,8 +179,11 @@ def _build_synthesis_prompt(
 
 async def run_stage_responses(session: CouncilSession) -> CouncilSession:
     """Stage 1: Gather independent responses from all council members."""
+    log_info("responses", f"Stage 1 started — querying {len(COUNCIL_MEMBERS)} members")
     tasks = [_query_member(m, session.query) for m in COUNCIL_MEMBERS]
     session.responses = await asyncio.gather(*tasks)
+    ok = sum(1 for r in session.responses if not r.error)
+    log_info("responses", f"Stage 1 complete — {ok}/{len(COUNCIL_MEMBERS)} successful")
     session.stage = "review"
     save_session(session)
     return session
@@ -167,11 +191,13 @@ async def run_stage_responses(session: CouncilSession) -> CouncilSession:
 
 async def run_stage_review(session: CouncilSession) -> CouncilSession:
     """Stage 2: Each member peer-reviews all other responses."""
+    log_info("review", f"Stage 2 started — {len(COUNCIL_MEMBERS)} reviewers")
     tasks = [
         _review_by_member(m, session.query, session.responses)
         for m in COUNCIL_MEMBERS
     ]
     session.reviews = await asyncio.gather(*tasks)
+    log_info("review", "Stage 2 complete — all reviews collected")
     session.stage = "synthesis"
     save_session(session)
     return session
@@ -179,7 +205,10 @@ async def run_stage_review(session: CouncilSession) -> CouncilSession:
 
 async def run_stage_synthesis(session: CouncilSession) -> CouncilSession:
     """Stage 3: The Chairman synthesizes the final answer."""
+    log_info("synthesis", f"Stage 3 started — Chairman: {CHAIRMAN_MODEL['name']}")
     prompt = _build_synthesis_prompt(session.query, session.responses, session.reviews)
+    log_request("synthesis", CHAIRMAN_MODEL["provider"], CHAIRMAN_MODEL["model"], _preview(prompt))
+    t0 = time.monotonic()
     try:
         provider = get_provider(CHAIRMAN_MODEL["provider"])
         text = await provider.generate(
@@ -187,16 +216,21 @@ async def run_stage_synthesis(session: CouncilSession) -> CouncilSession:
             system_prompt=SYSTEM_PROMPT_SYNTHESIS,
             user_prompt=prompt,
         )
+        duration = (time.monotonic() - t0) * 1000
+        log_response("synthesis", CHAIRMAN_MODEL["provider"], CHAIRMAN_MODEL["model"], _preview(text), duration)
         session.synthesis = SynthesisResponse(
             chairman_model=CHAIRMAN_MODEL["name"],
             synthesis=text,
         )
     except Exception as e:
+        duration = (time.monotonic() - t0) * 1000
+        log_error("synthesis", CHAIRMAN_MODEL["provider"], CHAIRMAN_MODEL["model"], str(e), duration)
         logger.error(f"Chairman synthesis error: {e}")
         session.synthesis = SynthesisResponse(
             chairman_model=CHAIRMAN_MODEL["name"],
             synthesis=f"Error during synthesis: {e}",
         )
+    log_info("synthesis", "Stage 3 complete")
     session.stage = "complete"
     save_session(session)
     return session
@@ -204,6 +238,7 @@ async def run_stage_synthesis(session: CouncilSession) -> CouncilSession:
 
 async def run_full_council(query: str) -> CouncilSession:
     """Run the complete 3-stage council process."""
+    log_info("council", f"New council session — query: {_preview(query, 100)}")
     session = CouncilSession(
         session_id=str(uuid.uuid4()),
         query=query,
@@ -215,4 +250,5 @@ async def run_full_council(query: str) -> CouncilSession:
     session = await run_stage_review(session)
     session = await run_stage_synthesis(session)
 
+    log_info("council", f"Council session complete: {session.session_id}")
     return session

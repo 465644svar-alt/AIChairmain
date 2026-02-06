@@ -417,6 +417,211 @@ button {
   margin-left: 1rem;
 }
 
+/* ── View Tabs (Council / Logs) ────────────────────── */
+
+.view-tabs {
+  display: flex;
+  gap: 0;
+  justify-content: center;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.view-tab {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.7rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.view-tab:hover {
+  color: var(--text);
+}
+
+.view-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Log Viewer ───────────────────────────────────── */
+
+.log-viewer {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 220px);
+  min-height: 400px;
+}
+
+.log-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: none;
+}
+
+.log-toolbar-left, .log-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.log-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 10px;
+}
+
+.log-status.connected {
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--success);
+}
+
+.log-status.disconnected {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--error);
+}
+
+.log-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.log-filter {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+
+.log-clear {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.log-clear:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.log-container {
+  flex: 1;
+  overflow-y: auto;
+  background: #0a0b0f;
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 0.5rem;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.log-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.log-entry {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  align-items: flex-start;
+  word-break: break-word;
+}
+
+.log-entry:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.log-entry.log-request {
+  color: #60a5fa;
+}
+
+.log-entry.log-response {
+  color: var(--success);
+}
+
+.log-entry.log-error {
+  color: var(--error);
+}
+
+.log-entry.log-info {
+  color: var(--text-muted);
+}
+
+.log-time {
+  color: #555;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.log-icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.log-stage {
+  color: var(--warning);
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.log-provider {
+  color: var(--accent);
+  flex-shrink: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-duration {
+  color: #94a3b8;
+  flex-shrink: 0;
+  min-width: 60px;
+  text-align: right;
+}
+
+.log-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-entry:hover .log-content {
+  white-space: normal;
+}
+
+.log-error-text {
+  color: var(--error);
+  font-weight: 500;
+}
+
 /* ── Responsive ────────────────────────────────────── */
 
 @media (max-width: 640px) {
@@ -424,4 +629,7 @@ button {
   .query-form { flex-direction: column; }
   .btn-primary { padding: 0.75rem; }
   .progress-bar { flex-wrap: wrap; }
+  .log-entry { font-size: 0.7rem; }
+  .log-provider { display: none; }
+  .log-duration { display: none; }
 }
