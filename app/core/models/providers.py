@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import logging
 import httpx
+from json import JSONDecodeError
 
 from ..types import LLMResult
 
@@ -18,6 +19,9 @@ class AsyncProviderClient:
 
     async def chat(self, model: str, messages: list[dict], timeout: float) -> LLMResult:
         started = time.perf_counter()
+        if not self.api_key:
+            return LLMResult(self.provider, model, None, "api key is not configured", 0, None)
+
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -28,11 +32,11 @@ class AsyncProviderClient:
                 resp = await client.post(f"{self.base_url}{self.model_path}", json=payload, headers=headers)
             latency = int((time.perf_counter() - started) * 1000)
             if resp.status_code in (401, 403):
-                return LLMResult(self.provider, model, None, f"auth error ({resp.status_code})", latency, resp.json() if resp.content else None)
+                return LLMResult(self.provider, model, None, f"auth error ({resp.status_code})", latency, self._safe_json(resp))
             if resp.status_code == 429:
-                return LLMResult(self.provider, model, None, "rate limit (429)", latency, resp.json() if resp.content else None)
+                return LLMResult(self.provider, model, None, "rate limit (429)", latency, self._safe_json(resp))
             resp.raise_for_status()
-            data = resp.json()
+            data = self._safe_json(resp) or {}
             content = (
                 data.get("choices", [{}])[0].get("message", {}).get("content")
                 or data.get("content")
@@ -50,3 +54,12 @@ class AsyncProviderClient:
             latency = int((time.perf_counter() - started) * 1000)
             logger.exception("Unexpected provider error")
             return LLMResult(self.provider, model, None, f"unexpected error: {exc}", latency, None)
+
+    @staticmethod
+    def _safe_json(resp: httpx.Response) -> dict | list | None:
+        if not resp.content:
+            return None
+        try:
+            return resp.json()
+        except JSONDecodeError:
+            return {"raw": resp.text}

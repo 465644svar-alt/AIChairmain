@@ -1,6 +1,11 @@
+import asyncio
+
+import httpx
+
 from app.core.branching import ConversationTree
 from app.core.council import aggregate_rankings, parse_ranking
-from app.core.types import LLMResult, Stage2Review, ConversationNode
+from app.core.models.providers import AsyncProviderClient
+from app.core.types import ConversationNode, LLMResult, Stage2Review
 
 
 def test_parse_ranking_strict():
@@ -33,3 +38,17 @@ def test_tree_ops():
     tree.add_node(n3)
     lineage = tree.lineage(n3.id)
     assert [n.content for n in lineage] == ["q1", "q2"]
+
+
+def test_chat_returns_config_error_without_api_key():
+    client = AsyncProviderClient("gpt", "https://api.openai.com/v1", None)
+    result = asyncio.run(client.chat("gpt-4o-mini", [{"role": "user", "content": "ping"}], 1))
+    assert result.error == "api key is not configured"
+    assert result.latency_ms == 0
+
+
+def test_safe_json_returns_raw_when_non_json_response():
+    request = httpx.Request("POST", "https://example.com")
+    response = httpx.Response(401, request=request, text="Unauthorized")
+    parsed = AsyncProviderClient._safe_json(response)
+    assert parsed == {"raw": "Unauthorized"}
