@@ -36,7 +36,10 @@ class CouncilOrchestrator:
         client = self.clients[provider]
         ok, error, latency, raw = await client.check_connectivity(self.timeout)
         if not ok:
-            return LLMResult(provider, model, None, f"connectivity check failed: {error}", latency, raw)
+            normalized_error = error or "connectivity check failed"
+            if normalized_error != "api key is not configured":
+                normalized_error = f"connectivity check failed: {normalized_error}"
+            return LLMResult(provider, model, None, normalized_error, latency, raw)
         return await client.chat(model, messages, self.timeout)
 
     async def stage2_peer_review(self, question: str, stage1: Stage1Result) -> Stage2Result:

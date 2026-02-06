@@ -77,6 +77,7 @@ def test_stage1_collect_stops_on_failed_connectivity_check():
 
     assert len(result.responses) == 1
     assert result.responses[0].error == "connectivity check failed: auth error (401)"
+    assert result.responses[0].raw == {"raw": "Unauthorized"}
     assert bad_client.chat_called is False
 
 
@@ -89,3 +90,17 @@ def test_stage1_collect_calls_chat_when_connectivity_ok():
     assert len(result.responses) == 1
     assert result.responses[0].content == "ok"
     assert good_client.chat_called is True
+
+
+
+def test_stage1_collect_keeps_missing_api_key_message_without_prefix():
+    class MissingKeyClient:
+        async def check_connectivity(self, timeout: float):
+            return False, "api key is not configured", 0, None
+
+        async def chat(self, model: str, messages: list[dict], timeout: float) -> LLMResult:
+            raise AssertionError("chat must not be called")
+
+    orchestrator = CouncilOrchestrator({"gpt": MissingKeyClient()})
+    result = asyncio.run(orchestrator.stage1_collect("q", {"gpt": "gpt-4o-mini"}))
+    assert result.responses[0].error == "api key is not configured"
