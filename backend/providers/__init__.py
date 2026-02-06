@@ -1,0 +1,22 @@
+"""LLM provider integrations — direct API calls, no OpenRouter."""
+
+from backend.providers.openai_provider import OpenAIProvider
+from backend.providers.anthropic_provider import AnthropicProvider
+from backend.providers.google_provider import GoogleProvider
+from backend.providers.groq_provider import GroqProvider
+from backend.providers.mistral_provider import MistralProvider
+
+PROVIDERS = {
+    "openai": OpenAIProvider,
+    "anthropic": AnthropicProvider,
+    "google": GoogleProvider,
+    "groq": GroqProvider,
+    "mistral": MistralProvider,
+}
+
+
+def get_provider(provider_name: str):
+    provider_class = PROVIDERS.get(provider_name)
+    if not provider_class:
+        raise ValueError(f"Unknown provider: {provider_name}")
+    return provider_class()
